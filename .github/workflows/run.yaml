@@ -1,0 +1,107 @@
+name: Run Command
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        default: dev
+        type: string
+      command:
+        required: true
+        type: string
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+      aws_region:
+        description: 'AWS Region'
+        required: false
+        type: string
+        default: 'us-west-2'
+    outputs:
+      output:
+        description: 'The output of the job'
+        value: ${{ jobs.run.outputs.output }}
+
+env:
+  DOCKER_BUILDKIT: 1
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: ${{ contains(inputs.command, 'deploy') && inputs.environment || '' }}
+    permissions:
+      id-token: write # This is required for requesting the JWT
+      contents: read  # This is required for actions/checkout
+    outputs:
+      output: ${{ steps.run_command.outputs.output }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for base_ref to be populated
+
+      - name: Configure git private packages
+        run: |
+          git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region || vars.AWS_REGION }}
+
+      # Allow debugging with tmate
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ inputs.debug_enabled }}
+        with:
+          limit-access-to-actor: true
+
+      # Installing python directly due to poetry issue with upstream python
+      # https://github.com/python-poetry/poetry/issues/7343
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: '.python-version' # Read python version from a file .python-version
+
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.5.1
+          virtualenvs-create: false
+
+      - name: Init environment and install dependencies
+        run: make init
+
+#      - name: make secrets
+#        run: make secrets
+
+      - id: run_command
+        name: Run command
+        run: |
+          set -o pipefail
+
+          export ENV=${{ inputs.environment }}
+          ${{ inputs.command }} | tee /tmp/output
+          exit_code=$?
+
+          delimiter="$(openssl rand -hex 8)"
+          echo "output<<${delimiter}" >> "${GITHUB_OUTPUT}"
+          cat /tmp/output >> "${GITHUB_OUTPUT}"
+          echo "${delimiter}" >> "${GITHUB_OUTPUT}"
+
+          exit ${exit_code}
+
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        if: always() && (contains(inputs.command, 'deploy') || contains(inputs.command, 'dagster_k8s')) && github.event_name != 'pull_request'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_ICON: https://github.com/revrod.png?size=48
+          SLACK_USERNAME: GitHub Actions
+          SLACK_TITLE: ${{ github.repository }}

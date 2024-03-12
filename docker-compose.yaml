@@ -1,0 +1,10 @@
+version: '3.9'
+
+services:
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: revrod/linkedin-collector:${TAG}
+    ports:
+      - "8000:8000"

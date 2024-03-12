@@ -1,0 +1,20 @@
+name: 'Test'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  lint:
+    uses: ./.github/workflows/run.yaml
+    with:
+      command: make lint
+    secrets: inherit
+
+  build:
+    uses: ./.github/workflows/run.yaml
+    with:
+      command: make build
+    secrets: inherit

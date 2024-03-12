@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: state
+  namespace: {{ namespace }}
+spec:
+  # a PVC with a non-empty selector can't have a PV dynamically provisioned for it.
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2  # Only for AWS EKS to dynamically provision a volume
