@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright/python:v1.41.2-jammy
+FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 
 RUN pip install poetry==1.5.1
 
