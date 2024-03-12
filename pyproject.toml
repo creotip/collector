@@ -26,7 +26,7 @@ faker = "^23.3.0"
 pytest-cov = "^4.1.0"
 
 [tool.poetry.group.deployer.dependencies]
-boto3 = "^1.34.46"
+boto3 = "^1.34.60"
 generic-service-chart = {git = "https://github.com/revrod/generic-service-chart", rev = "main"}
 typer = "^0.9.0"
 
